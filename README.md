@@ -1,17 +1,50 @@
-# AskITGenio Pages Upload
+# AskITGenio Clean
 
-Это пакет только для GitHub Pages.
+Чистая версия локального бота AskITGenio с интерфейсом "гуся".
 
-Что загрузить в репозиторий:
+## Что внутри
 
-- папку `docs/` целиком
+- `src/` — live backend
+- `public/` — интерфейс с гусем
+- `public/assets/` — ассеты гуся
+- `data/` — старые локальные выгрузки, их можно использовать как резерв
+- `scripts/` — проверки конфигурации и smoke tests
 
-Что поменять перед публикацией:
+## Запуск
 
-1. Откройте `docs/config.js`
-2. Впишите адрес вашего backend
+```bash
+cd /Users/sophie/Documents/Codex/2026-06-01/files-mentioned-by-the-user-pasted/outputs/AskITGenio_clean
+npm start
+```
 
-Пример:
+Откройте [http://localhost:5177](http://localhost:5177).
+
+## Live-режим
+
+Бот отвечает через:
+
+- `GENA API`
+- `Notion API`
+- `OpenAI Responses API`
+
+Нужны переменные окружения из `.env.example`:
+
+- `OPENAI_API_KEY`
+- `GENA_TOKEN`
+- `NOTION_API_KEY`
+- `CORS_ALLOW_ORIGIN` — домен фронта, если интерфейс будет жить отдельно, например на GitHub Pages
+
+Опционально:
+
+- `OPENAI_MODEL`
+- `GENA_BASE_URL`
+- `NOTION_API_VERSION`
+- `NOTION_ROOT_PAGE_ID`
+
+## GitHub Pages
+
+Если публикуете только интерфейс на GitHub Pages, в `public/config.js` или `docs/config.js`
+нужно прописать адрес backend, например:
 
 ```js
 window.ASKITGENIO_CONFIG = {
@@ -19,12 +52,14 @@ window.ASKITGENIO_CONFIG = {
 };
 ```
 
-Как включить Pages:
+## Проверка
 
-1. `Settings` → `Pages`
-2. `Source` → `Deploy from a branch`
-3. `Branch` → `main`
-4. `Folder` → `/docs`
-5. `Save`
+```bash
+npm run check:live
+```
 
-Важно: GitHub Pages публикует только интерфейс. Для ответов бота нужен отдельно запущенный backend с API.
+Если хотите запускать старые локальные тесты по выгрузкам:
+
+```bash
+npm run test:smoke
+```
