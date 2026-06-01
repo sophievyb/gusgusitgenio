@@ -1,4 +1,49 @@
 export function createLiveAnswerEngine({ genaClient, notionClient, openaiClient }) {
+  function buildNotionQueries(question, skill) {
+    const queries = new Set([question]);
+    const q = question.toLowerCase();
+
+    if (q.includes("завед")) {
+      queries.add("заведующий направления");
+      queries.add("заведующие и направления");
+      queries.add("как стать заведующим направления");
+      queries.add("направления");
+      if (skill?.title) {
+        queries.add(`заведующий ${skill.title}`);
+        queries.add(`${skill.title} направление`);
+      }
+    }
+
+    if (
+      (q.includes("убрат") || q.includes("удал") || q.includes("скрыт") || q.includes("измен")) &&
+      q.includes("направ")
+    ) {
+      queries.add("направления");
+      queries.add("доступность направления");
+      queries.add("недоступно направление");
+      queries.add("шестеренка в гене");
+      queries.add("технические проблемы по направлениям");
+    }
+
+    if (
+      q.includes("метод") ||
+      q.includes("рекомендац") ||
+      q.includes("академ") ||
+      q.includes("обучен") ||
+      q.includes("лаборатор") ||
+      q.includes("тренер")
+    ) {
+      queries.add("методические рекомендации");
+      queries.add("рекомендации для тренеров по проведению занятий");
+      queries.add("академия тренеров");
+      queries.add("лаборатория обучения тренеров");
+      queries.add("обучение тренеров");
+      queries.add("тренер");
+    }
+
+    return Array.from(queries);
+  }
+
   function buildFallbackAnswer(question, skill, notionMatches, modelError) {
     const lines = [];
 
@@ -54,24 +99,36 @@ export function createLiveAnswerEngine({ genaClient, notionClient, openaiClient 
   async function answerQuestion(question) {
     const skills = await genaClient.listSkills();
     const skill = genaClient.matchSkill(question, skills);
+    const notionQueries = buildNotionQueries(question, skill);
 
-    let searchPages = await notionClient.searchPages(question);
-    if (!searchPages.length && process.env.NOTION_ROOT_PAGE_ID) {
-      try {
-        searchPages = [await notionClient.retrievePage(process.env.NOTION_ROOT_PAGE_ID)];
-      } catch {
-        searchPages = [];
+    const byId = new Map();
+
+    for (const query of notionQueries) {
+      const remotePages = await notionClient.searchPages(query);
+      const rootTreePages = await notionClient.searchWithinRootTree(query);
+
+      for (const page of [...remotePages, ...rootTreePages]) {
+        const existing = byId.get(page.id);
+        const seedScore = page.score || 0;
+        if (!existing || seedScore > (existing.seedScore || 0)) {
+          byId.set(page.id, { ...page, seedScore });
+        }
       }
     }
 
-    const foundPages = notionClient.rerankPages(question, searchPages)
+    let foundPages = Array.from(byId.values())
+      .map((page) => ({
+        ...page,
+        score: (page.seedScore || 0) + notionClient.scorePage(question, page),
+      }))
+      .sort((a, b) => b.score - a.score)
       .filter((page) => page.score > 0)
-      .slice(0, 3);
+      .slice(0, 4);
 
     if (!foundPages.length && process.env.NOTION_ROOT_PAGE_ID) {
       try {
         const rootPage = await notionClient.retrievePage(process.env.NOTION_ROOT_PAGE_ID);
-        foundPages.push({ ...rootPage, score: 1 });
+        foundPages = [{ ...rootPage, score: 1 }];
       } catch {
         // Ignore root page fallback failures and continue with other sources.
       }
