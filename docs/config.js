@@ -1,3 +1,3 @@
 window.ASKITGENIO_CONFIG = {
-  apiBaseUrl: "",
+  apiBaseUrl: "https://gusgusitgenio-final.onrender.com",
 };
